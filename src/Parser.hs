@@ -77,7 +77,7 @@ alphanum :: Parser Char
 alphanum = sat isAlphaNum
 
 special :: Parser Char
-special = oneOf "_:!#$%%&*+./<=>?@\\^|-~"
+special = oneOf "_:!#$%%&*+/<=>?@^|-~"
 
 char :: Char -> Parser Char
 char x = sat (== x)

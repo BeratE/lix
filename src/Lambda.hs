@@ -17,14 +17,14 @@ Lambda Calculus implemented as small subset of Lisp SExpr
   delta: { ((Const Lambda) x y) => \x -> y
 --}
 
--- evaluate using weak-head normal order reduction
-eval :: LispVal -> LispVal
-eval r@(List [(Symbol "LAMBDA"), List x', body]) =
+-- translate a complex parse tree into a simple parse tree
+transl :: LispVal -> LispVal
+transl t@(List [Const Lambda, List x', body]) =
   case x' of
-    [x]    -> List [(Symbol "LAMBDA"), x, body]
-    (x:xs) -> List [(Symbol "LAMBDA"), x, eval (List [(Symbol "LAMBDA"), List xs, body])]
-eval r@(List ((Symbol s) : _)) = let d = delta r in if (d == (Const Nil)) then r else d
-eval r = r
+    []     -> body
+    [x]    -> List [Const Lambda, x, body]
+    (x:xs) -> List [Const Lambda, x, transl (List [Const Lambda, List xs, body])]
+
 
 -- get free variables of a lambda term
 freeVar :: LispVal -> [String]
@@ -62,13 +62,26 @@ beta l = Const Nil
 
 -- evaluate application of constants (i.e. special symbols)
 delta :: LispVal -> LispVal
+-- if exp1 exp2 exp3, lazy evaluation
 delta (List (Const If : ts))
   = case ts of
       [Const (Lit (Bool True)), e2, _ ] -> e2
       [Const (Lit (Bool False)), _, e3] -> e3
       otherwise -> Const Nil
-delta c = Const Nil
+-- quote is identity on parameters, lazy evaluation
+delta (List (Const Quote : ts))
+  = case ts of
+      [] -> Const Nil
+      [x] -> x
+      otherwise -> List ts
+-- fixpoint, fix f => f (fix f)
+delta t@(List ((Const Fix) : ts))
+  = case ts of
+      [] -> Const Nil
+      [x] -> List (x : [t])
+      otherwise -> List $ (List ts) : [t]
 
+delta c = Const Nil
 
 combOmega :: Maybe LispVal
 combOmega = readExpr "((lambda x (x x)) (lambda x (x x)))"
