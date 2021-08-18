@@ -11,78 +11,93 @@ type LispEnv = Map.Map String LispVal
 
 -- Domain of Lisp Programms
 data LispVal
-  = Lit Lit
+  = Const Const
   | Symbol String
   | List [LispVal]
-  | Lambda Func LispEnv
+  deriving (Eq)
 
 newtype Func = Func { apply :: [LispVal] -> LispVal }
 
-data Lit
-  = LNil
-  | LBool Bool
-  | LNumber Int
-  | LString String
+data Const
+  = Nil | Quote | Car | Cdr | Cons | If | Lambda | Op String | Lit Lit
   deriving (Eq)
 
-instance Eq LispVal where
-  (==) (Lit x) (Lit y)             = x == y
-  (==) (Symbol s1) (Symbol s2)     = s1 == s2
-  (==) (List (x:xs)) (List (y:ys)) = x == y && (List xs) == (List ys)
-  (==) _ _                         = False
+data Lit =
+    Bool Bool
+  | Number Int
+  | String String
+  deriving (Eq)
 
 instance Show LispVal where
   show val =
     case val of
       (Symbol sym) -> sym
       (List xs)    -> show xs
-      (Lit lit)    -> show lit
-      (Lambda _ _) -> "lambda function"
+      (Const lit)  -> show lit
+
+instance Show Const where
+  show const =
+    case const of
+      Nil    -> "'()"
+      Quote  -> "'"
+      Car    -> "#CAR"
+      Cdr    -> "#CDR"
+      Cons   -> "#CONS"
+      If     -> "#IF"
+      Lambda -> "#LAMBDA"
+      Op op  -> "#"++op
+      Lit l  -> show l
 
 instance Show Lit where
   show lit =
     case lit of
-      (LBool True)  -> "#T"
-      (LBool False) -> "#F"
-      (LNumber num) -> show num
-      (LString str) -> "\"" ++ str ++ "\""
-      LNil          -> "'()"
+      Bool True  -> "#T"
+      Bool False -> "#F"
+      Number num -> show num
+      String str -> "\"" ++ str ++ "\""
 
 
 -- Parsers / Grammar for our Lisp with syntax directed translation,
 -- i.e. parse input and compute LispVal from (node) attributes
 pExpr :: Parser LispVal
-pExpr = pLit +++ pQuote +++ pSymbol +++ pSExpr
+pExpr = pQuote +++ pConst +++ pSymbol +++ pSExpr
 
-pLit :: Parser LispVal
-pLit = pReserved +++ pNumber +++ pString
+pConst :: Parser LispVal
+pConst = pKeySym +++ pNumber +++ pString
 
-pReserved :: Parser LispVal
-pReserved = do string "NIL"
-               return $ Lit LNil
-             +++ (do string "#T"
-                     return $ Lit (LBool True))
-             +++ (do string "#F"
-                     return $ Lit (LBool False))
+pKeySym :: Parser LispVal
+pKeySym = do {s <- oneOf "+-*/"; return $ Const (Op [s])}
+      +++ do s <- sym
+             case s of
+               "QUOTE"   -> return $ Const Quote
+               "NIL"     -> return $ Const Nil
+               "CAR"     -> return $ Const Car
+               "CDR"     -> return $ Const Cdr
+               "CONS"    -> return $ Const Cons
+               "IF"      -> return $ Const If
+               "LAMBDA"  -> return $ Const Lambda
+               "#T"      -> return $ Const $ Lit (Bool True)
+               "#F"      -> return $ Const $ Lit (Bool False)
+               otherwise -> failure
+
+pQuote :: Parser LispVal
+pQuote = do char '\''
+            x <- pExpr
+            return $ List [Const Quote, x]
 
 pNumber :: Parser LispVal
 pNumber = do n <- int
-             return $ Lit $ LNumber n
-
-pSymbol :: Parser LispVal
-pSymbol = do p <- sym
-             return $ Symbol p
+             return $ Const $ Lit $ Number n
 
 pString :: Parser LispVal
 pString = do char '\"'
              s <- untill '\"'
              char '\"'
-             return $ Lit $ LString s
+             return $ Const $ Lit $ String s
 
-pQuote :: Parser LispVal
-pQuote = do char '\''
-            x <- pExpr
-            return $ List [Symbol "quote", x]
+pSymbol :: Parser LispVal
+pSymbol = do p <- sym
+             return $ Symbol p
 
 pSExpr :: Parser LispVal
 pSExpr = do char '('

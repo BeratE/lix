@@ -10,9 +10,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Char
 
-
--- A Parser over an alphabet of type a is a transition from an input-
--- to an output stream (of that alphabet) while computing a result of type c.
 newtype Parser a = Parser {parse :: String -> Maybe (a, String)}
 
 
@@ -63,7 +60,6 @@ sat :: (Char -> Bool) -> Parser Char
 sat p = do x <- item
            if p x then return x else failure
 
-
 -- basic lexemes/terminals
 digit :: Parser Char
 digit = sat isDigit
@@ -95,43 +91,26 @@ untill x = Parser.many1 $ sat(/= x)
 
 string :: String -> Parser String
 string [] = return []
-string (x:xs) = do char x
-                   string xs
-                   return (x:xs)
+string (x:xs) = do {char x; string xs ; return (x:xs)}
 
 ident :: Parser String
 ident = do x <- letter 
            xs <- Parser.many (alphanum +++ special)
            return (x:xs)
-        +++ do xs <- Parser.many1 special
-               return xs
+    +++ do xs <- Parser.many1 special
+           return xs
 
 sym :: Parser String
 sym = fmap (map toUpper) ident
 
 nat :: Parser Int
-nat = do xs <- many1 digit
-         return (read xs)
+nat = do {xs <- many1 digit; return (read xs)}
 
 int :: Parser Int
-int = do x <- char '-'
-         xs <- nat
-         return $ negate xs
-       +++ nat
-
-float :: Parser Double
-float = do n <- fmap fromIntegral int
-           char '.'
-           fr <- do x <- fmap fromIntegral nat
-                    return x
-                  +++ return 0
-           let f = fr / 10 ^ floor ((logBase 10 fr) + 1)
-           return $ n + f
+int = do {x <- char '-'; xs <- nat; return $ negate xs} +++ nat
 
 space :: Parser ()
-space = do Parser.many1 $ (sat isSpace) +++ (char '\n')
-           return ()           
-
+space = do {Parser.many1 $ (sat isSpace) +++ (char '\n');  return ()}
 
 comment :: Parser ()
 comment = do string "--"
@@ -140,8 +119,7 @@ comment = do string "--"
              return () 
 
 blank :: Parser ()
-blank = do Parser.many $ space +++ comment
-           return ()
+blank = do {Parser.many $ space +++ comment; return ()}
 
 -- token as lexeme that ignores space characters
 token :: Parser a -> Parser a
