@@ -16,15 +16,12 @@ data LispVal
   | List [LispVal]
   deriving (Eq)
 
-newtype Func = Func { apply :: [LispVal] -> LispVal }
-
 data Const
   = Fix | Nil | Quote | Car | Cdr | Cons | If | Lambda | Op String | Lit Lit
   deriving (Eq)
 
-data Lit =
-    Bool Bool
-  | Number Int
+data Lit
+  = Number Int
   | String String
   deriving (Eq)
 
@@ -52,8 +49,6 @@ instance Show Const where
 instance Show Lit where
   show lit =
     case lit of
-      Bool True  -> "#T"
-      Bool False -> "#F"
       Number num -> show num
       String str -> "\"" ++ str ++ "\""
 
@@ -111,8 +106,6 @@ pKeyword = do {s <- oneOf "+-*/"; return $ Const (Op [s])}
                 "CONS"    -> return $ Const Cons
                 "IF"      -> return $ Const If
                 "LAMBDA"  -> return $ Const Lambda
-                "#T"      -> return $ Const $ Lit (Bool True)
-                "#F"      -> return $ Const $ Lit (Bool False)
                 otherwise -> failure             
              
 -- literals
