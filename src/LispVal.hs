@@ -7,8 +7,6 @@ import System.IO
 import Data.Map(Map)
 import qualified Data.Map as Map
 
-type LispEnv = Map.Map String LispVal
-
 -- Syntax Tree in Domain of Lisp Programms
 data LispVal
   = Const Const
@@ -17,7 +15,9 @@ data LispVal
   deriving (Eq)
 
 data Const
-  = Fix | Nil | Quote | Car | Cdr | Cons | If | Lambda | Op String | Lit Lit
+  = Bot | Nil | Let | Fix
+  | Atom | Quote | Car | Cdr | Cons | If | Lambda
+  | Op String | Lit Lit
   deriving (Eq)
 
 data Lit
@@ -29,21 +29,27 @@ instance Show LispVal where
   show val =
     case val of
       (Symbol sym) -> sym
-      (List xs)    -> show xs
+      (List [c@(Const Lambda), Symbol s, b]) -> "("++(show c)++s++"."++show b++")"
+      (List ts) -> "(" ++  init (showApp ts) ++")"
       (Const lit)  -> show lit
+      where showApp [] = []
+            showApp (t:ts) = show t ++ " " ++ showApp ts
 
 instance Show Const where
   show const =
     case const of
-      Fix    -> "#FIX"
+      Bot    -> "BOT"
       Nil    -> "'()"
+      Let    -> "LET"
+      Fix    -> "FIX"
+      Atom   -> "ATOM"
       Quote  -> "'"
-      Car    -> "#CAR"
-      Cdr    -> "#CDR"
-      Cons   -> "#CONS"
-      If     -> "#IF"
-      Lambda -> "#\\"
-      Op op  -> "#"++op
+      Car    -> "CAR"
+      Cdr    -> "CDR"
+      Cons   -> "CONS"
+      If     -> "IF"
+      Lambda -> "\0955"
+      Op op  -> op
       Lit l  -> show l
 
 instance Show Lit where
@@ -98,9 +104,11 @@ pKeyword :: Parser LispVal
 pKeyword = do {s <- oneOf "+-*/"; return $ Const (Op [s])}
        +++ do s <- sym
               case s of
+                "BOT"     -> return $ Const Bot
+                "NIL"     -> return $ Const Nil
+                "LET"     -> return $ Const Let
                 "FIX"     -> return $ Const Fix
                 "QUOTE"   -> return $ Const Quote
-                "NIL"     -> return $ Const Nil
                 "CAR"     -> return $ Const Car
                 "CDR"     -> return $ Const Cdr
                 "CONS"    -> return $ Const Cons

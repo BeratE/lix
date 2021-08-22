@@ -70,11 +70,11 @@ deltaRed t@(List (Const c : ts))
       If    -> funIf ts
       Fix   -> funFix ts
       --Quote -> funQuote ts
-      otherwise -> Const Nil
+      otherwise -> Const Bot
 deltaRed t = rewrite deltaRed t
 
 checkDelta :: [LispVal] -> [LispVal]
-checkDelta p = if not $ isClosed (List p) then [] else fmap reduce p              
+checkDelta p = if not $ isClosed (List p) then [] else fmap eval p              
 
 -- if exp1 exp2 exp3, lazy evaluation
 funIf :: [LispVal] -> LispVal
@@ -82,23 +82,23 @@ funIf (e1 : e2 : e3 : ts)
   = case checkDelta (e1:e2:[e3]) of
       [Const Nil, _  , e3'] -> List (e3':ts)
       [_        , e2',   _] -> List (e2':ts)
-      otherwise -> Const Nil
-funIf _ = Const Nil
+      otherwise -> Const Bot
+funIf _ = Const Bot
 
 -- fixpoint, fix f => f (fix f)
 funFix :: [LispVal] -> LispVal
 funFix (t:ts)
   = let fs= checkDelta [t]
-    in if null fs then Const Nil                       
+    in if null fs then Const Bot
        else case fs of
               [f] -> List (f : List (Const Fix : [f]) : ts)
-              otherwise -> Const Nil
-funFix _ = Const Nil
+              otherwise -> Const Bot
+funFix _ = Const Bot
 {--      
 -- quote is identity on parameters, lazy evaluation
 funQuote :: [LispVal] -> LispVal
 funQuote [ts]
-  = case ts of
+  = case ts of      (List [t]    -> show t
       [] -> Const Nil
       [t] -> t
       otherwise -> List ts
@@ -110,35 +110,36 @@ rewrite red (List [t]) = red t
 rewrite red (List (List [t] : ts)) = red $ List (t : ts)
 rewrite red (List [Const Lambda, s@(Symbol _), b])
   = let t = red b
-    in if t /= (Const Nil)
+    in if t /= (Const Bot)
        then List [Const Lambda, s, t]
-       else (Const Nil)
+       else (Const Bot)
 rewrite red (List (h:t:ts))
   = let h'  = red h
         ts' = red $ List (t:ts)
-    in if h' /= (Const Nil)
+    in if h' /= (Const Bot)
        then List (h' : t : ts)
        else case ts' of
-              Const Nil -> (Const Nil)
+              Const Bot -> Const Bot
               List lts' -> List (h : lts')
               otherwise -> List (h : [ts'])
-rewrite _ _ = Const Nil
+rewrite _ _ = Const Bot
 
 -- Weak Head Normal Order reduction
 redWeakHead :: LispVal -> LispVal
 redWeakHead (List [t]) = redWeakHead t
-redWeakHead (List ((Symbol _) : _)) = Const Nil
-redWeakHead (List [Const Lambda, Symbol _]) = Const Nil
+redWeakHead (List ((Symbol _) : _)) = Const Bot
+redWeakHead (List [Const Lambda, Symbol _]) = Const Bot
 redWeakHead t@(List ((Const _) : _)) = deltaRed t
 redWeakHead t@(List (List [Const Lambda, _, _] : _)) = betaRed t
 redWeakHead (List (List t : ts))
   = let r = redWeakHead $ List t
-    in if r /= Const Nil then List (r:ts) else Const Nil
-redWeakHead t = Const Nil
+    in if r /= Const Bot then List (r:ts) else Const Bot
+redWeakHead _ = Const Bot
 
 -- reduce term until weak head normal form
-reduce :: LispVal -> LispVal
-reduce t = let r = redWeakHead t
-           in if r == Const Nil
+eval :: LispVal -> LispVal
+eval (List [t]) = eval t
+eval t = let r = redWeakHead t
+           in if r == Const Bot
               then t
-              else if t == r then Const Nil else reduce r
+              else if t == r then Const Bot else eval r

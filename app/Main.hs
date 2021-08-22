@@ -1,6 +1,6 @@
 module Main where
 
-import Parser
+import Repl
 
 main :: IO ()
-main = putStrLn "Hello World!"
+main = Repl.repl

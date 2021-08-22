@@ -95,13 +95,12 @@ string (x:xs) = do {char x; string xs ; return (x:xs)}
 
 ident :: Parser String
 ident = do x <- letter 
-           xs <- Parser.many (alphanum +++ special)
+           xs <- Parser.many alphanum
            return (x:xs)
-    +++ do xs <- Parser.many1 special
-           return xs
 
 sym :: Parser String
-sym = fmap (map toUpper) ident
+sym = do sym <- (ident +++ Parser.many1 special)
+         return $ fmap toUpper sym
 
 nat :: Parser Int
 nat = do {xs <- many1 digit; return (read xs)}
