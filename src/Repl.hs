@@ -2,7 +2,7 @@ module Repl (repl) where
 
 import Parser
 import LispVal
-import Lambda
+import Eval
 import System.Console.Haskeline
 import Control.Monad.Trans.Class
 type History = [String]
@@ -19,23 +19,18 @@ doRepl = do
   case minp of
     Nothing        -> outputStrLn $ "Something went wrong."
     Just (':':cmd) -> procCmd $ words cmd
-    Just inp       -> do outputStrLn inp
-                         outputStrLn $ procExpr inp
+    Just inp       -> do outputStrLn $ procExpr inp
                          doRepl
             
 procExpr :: String -> String
 procExpr str
   = let expr = readExpr str
     in case expr of              
-    Nothing -> "parse error."
-    Just x  -> printExpr $ eval x
+         Nothing -> "parse error."
+         Just x  -> (show x) ++ "\n" ++ (printExpr $ eval x)
 
 printExpr :: LispVal -> String
-printExpr expr = "Output: " ++
-  case expr of
-    (Symbol _) -> "Symbol " ++ show expr
-    otherwise  -> show expr
-  ++ "\n"
+printExpr expr = (show expr) ++ "\n"
 
 procCmd :: [String] -> InputT IO ()
 procCmd ["quit"] = outputStrLn "\nFarewell.\n" >> return () 

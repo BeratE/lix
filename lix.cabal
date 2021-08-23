@@ -25,9 +25,9 @@ source-repository head
 
 library
   exposed-modules:
-      Lambda
-      LispVal
       Parser
+      LispVal
+      Eval
       Repl
   other-modules:
       Paths_lix
