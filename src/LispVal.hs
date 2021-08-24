@@ -3,6 +3,8 @@ module LispVal where
 
 import Parser 
 import System.IO
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Class
 
 -- Syntax Tree in Domain of Lisp Programms
 data LispVal = Symbol String | Lit Lit | List [LispVal]
@@ -87,8 +89,9 @@ pList = do xs <- many1 $ token pExpr
 -- building the parse tree
 readExpr :: String -> Maybe LispVal
 readExpr s = parse (token pExpr) s >>= \(v, _) -> (return v)
-
+  
 readExprFile :: String -> IO LispVal
 readExprFile file = do contents <- readFile file
-                       Just (v, _) <- return $ parse pList contents
-                       return v                                            
+                       case parse pList contents of
+                         Nothing -> return (Symbol "BOT")
+                         Just (v,_) -> return v

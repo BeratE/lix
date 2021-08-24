@@ -104,7 +104,7 @@ space :: Parser ()
 space = do {Parser.many1 $ (sat isSpace) +++ (char '\n');  return ()}
 
 comment :: Parser ()
-comment = do string "--"
+comment = do string ";;"
              Parser.many $ sat (/= '\n')
              char '\n'
              return () 

@@ -5,7 +5,6 @@ import LispVal
 import Eval
 import System.Console.Haskeline
 import Control.Monad.Trans.Class
-type History = [String]
 
 repl :: IO ()
 repl = do
@@ -36,7 +35,10 @@ procCmd :: [String] -> InputT IO ()
 procCmd ["quit"] = outputStrLn "\nFarewell.\n" >> return () 
 procCmd ["help"] = outputStrLn helpText >> doRepl
 procCmd ["load"] = outputStrLn "Please specify a proper file handle." >> doRepl
-procCmd ["load", file] = (lift $ readExprFile file) >> doRepl
+procCmd ["load", file]
+  = do expr <- lift $ readExprFile file
+       outputStrLn $ show $ eval $ expr
+       doRepl
 procCmd _ = doRepl
 
 helpText :: String

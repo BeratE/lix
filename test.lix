@@ -1,0 +1,7 @@
+(let fib (lambda x
+           (cond (((eq x 1) 1)
+                  ((eq x 2) 1)
+                  ('t
+                   (+ (fib (- x 1))
+                      (fib (- x 2)))))))
+     (fib 16))

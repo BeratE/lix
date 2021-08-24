@@ -9,12 +9,13 @@ Lambda Calculus implemented as small subset of Lisp SExpr
   constant lambda to a lambda expression;
   deltaRed: { ((Const Lambda) x y) => \x -> y
 --}
-module Eval (eval) where
+module Eval where
 
 import LispVal
 import Data.List
 
-symconst = ["BOT", "T", "NIL", "QUOTE", "EQ", "IF", "FIX", "LAMBDA"]
+arithops = ["+","-","*","/"]
+symconst = ["BOT", "NIL", "IF", "LET", "COND", "ATOM", "LAMBDA"] ++ arithops
 
 -- get free variables of a lambda term
 freeVar :: LispVal -> [String]
@@ -54,41 +55,73 @@ betaRed t = rewrite betaRed t
 -- deltaRed reduction (constants/functions) using leftmost-outermost evaluation
 deltaRed :: LispVal -> LispVal
 deltaRed t@(List (Symbol c : ts))
-  = case c of
-      "IF"    -> funIf ts
-      "EQ"    -> funEq ts
-      "FIX"   -> funFix ts
-      "QUOTE" -> funQuote ts
-      otherwise -> Symbol "BOT"
+  | c `elem` arithops = funArith c ts
+  | c == "IF"         = funIf ts  
+  | c == "EQ"         = funEq ts  
+  | c == "FIX"        = funFix ts 
+  | c == "LET"        = funLet ts 
+  | c == "ATOM"       = funAtom ts
+  | otherwise         =  Symbol "BOT"
 deltaRed t = rewrite deltaRed t
 
 checkDelta :: [LispVal] -> [LispVal]
 checkDelta p = if not $ isClosed (List p) then [] else fmap eval p              
 
+-- perform arithmetic operations
+funArith :: String -> [LispVal] -> LispVal
+funArith c (a:b:ts)
+  = let args = fmap eval [a,b]
+        ret t = if null ts then t else List (t : ts)
+        perf c a b = case c of
+          "+" -> a + b
+          "-" -> a - b
+          "*" -> a * b         
+    in case args of
+         [Lit (Number a'), Lit (Number b')] -> ret (Lit (Number (perf c a' b')))
+         otherwise -> Symbol "BOT"
+
 -- if exp1 exp2 exp3, lazy evaluation
 funIf :: [LispVal] -> LispVal
 funIf (t : e1 : e2 : ts)
-  = case checkDelta ([t]) of
-      [Symbol "NIL"] -> List (eval e2 : ts)
-      [_           ] -> List (eval e1 : ts)
-      otherwise -> Symbol "BOT"
+  = let ret t = if null ts then t else List (t : ts)
+    in ret $ case eval t of
+               Symbol "BOT" -> Symbol "BOT"
+               Symbol "NIL" -> eval e2
+               otherwise    -> eval e1
 funIf _ = Symbol "BOT"
 
 -- check if argument one and two are equal
 funEq :: [LispVal] -> LispVal
 funEq (t1 : t2 : ts)
   = let [t1', t2'] = fmap eval [t1,t2]
-    in case [t1', t2'] of
-         [Symbol a, Symbol b] -> List (eq a b : ts)
-         [Lit    a, Lit    b] -> List (eq a b : ts)
-         otherwise -> List (Symbol "NIL" : ts)
-    where eq a b = if a == b then Symbol "T" else Symbol "NIL"
+        ret t = if null ts then t else List (t : ts)
+        eq a b = if a == b then Symbol "T" else Symbol "NIL"
+    in ret $ case [t1', t2'] of
+               [Symbol a, Symbol b] -> eq a b
+               [Lit    a, Lit    b] -> eq a b
+               otherwise            -> Symbol "NIL"
 funEq _ = Symbol "BOT"
 
 -- fixpoint, fix f => f (fix f)
 funFix :: [LispVal] -> LispVal
 funFix (t:ts) = List (t : List (Symbol "FIX" : [t]) : ts)
 funFix _ = Symbol "BOT"
+
+-- declar let
+funLet :: [LispVal] -> LispVal
+funLet (a@(Symbol _) : t : ts)
+  = let ft' = eval $ List[Symbol "FIX", List [(Symbol "LAMBDA"), a, t]]
+    in List [(List ((Symbol "LAMBDA") : a : ts)), ft']
+
+-- check if argument is a lit or symbol
+funAtom :: [LispVal] -> LispVal
+funAtom (t:ts)
+  = let t' = eval t
+        ret t = if null ts then t else List (t:ts)
+    in ret $ case t' of
+               (Symbol _) -> t'
+               (Lit   _) -> t'
+               otherwise  -> Symbol "NIL"
 
 -- quote is identity on parameters, lazy evaluation
 funQuote :: [LispVal] -> LispVal
@@ -122,13 +155,17 @@ redWeakHead t@(List ((Symbol _) : _)) = deltaRed t
 redWeakHead t@(List (List [Symbol "LAMBDA", _, _] : _)) = betaRed t
 redWeakHead (List (List t : ts))
   = let r = redWeakHead $ List t
-    in if r /= Symbol "BOT" then List (r:ts) else Symbol "BOT"
+    in if r /= Symbol "BOT" then List (r:ts) else Symbol "BOT"                                                  
 redWeakHead _ = Symbol "BOT"
 
 -- translate a complex term into a simple term
 transl :: LispVal -> LispVal
 transl (List [t]) = transl t
 transl (List [])  = Symbol "NIL"
+transl (List (Symbol "COND" : List ((List [c,t]) : as) : rest))
+  | null as   = transl $ List (List [Symbol "IF", c, t, (Symbol "NIL")] : rest)
+  | otherwise = transl $ List ((List [Symbol "IF", c, t,
+                                      transl (List [Symbol "COND", List (as)])]) : rest)
 transl (List [Symbol "LAMBDA", List x', body])
   = case x' of
       []     -> body
@@ -141,6 +178,7 @@ transl t = t
 eval :: LispVal -> LispVal
 eval t = evalt $ transl t
          where evalt (List [t]) = evalt t
+               evalt (List (Symbol "QUOTE" : t : _)) = t
                evalt t = let r = redWeakHead t
                          in if r == Symbol "BOT"
                             then t
