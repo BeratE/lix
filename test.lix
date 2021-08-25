@@ -1,7 +1,12 @@
+;; The favorite function of every functional programmer
 (let fib (lambda x
            (cond (((eq x 1) 1)
                   ((eq x 2) 1)
-                  ('t
+                  (1
                    (+ (fib (- x 1))
                       (fib (- x 2)))))))
-     (fib 16))
+     (fib 9))
+;;(let f (lambda x
+;;         (cond (((eq x 0) 0)
+;;               (1 (f (-x 1))))))
+;;     (f 10))
