@@ -34,3 +34,16 @@ To make life little bit easier, we introduce some syntactical constructs that ar
 A Lambda abstraction can be written as `(\args.expr)`, where `args` consists of one or more symbols denoting the bound variables in the expression `expr` following the dot. This construct will be pased into the lambda S-Expr `(LAMBDA (args) expr)`. Internally, only lambda abstractions with a single bound variable are valid lambda terms. If a lambda S-Expr has a list of symbols in its arguments, the expression will be translated into nested lambda terms with single bound variables each.
 
 The `COND` expression as known from Lisp can be written as `(COND conds)`, where `conds` is a list of one or more conditions of the form `(pred expr)`. The `pred` part of each condition is evaluated in order until one evaluates to a non Nil value. The corresponding `expr` of that non Nil `pred` is then evaluated which is the value of the whole `COND` expression. The `COND` expression is internally translated to nested `IF` expressions.
+
+## Example
+The fibonacci function in LiX looks like this:
+```lisp
+;; The favorite function of every functional programmer
+(let fib (lambda x
+           (cond (((eq x 1) 1)
+                  ((eq x 2) 1)
+                  (1
+                   (+ (fib (- x 1))
+                      (fib (- x 2)))))))
+     (fib 9))
+```
