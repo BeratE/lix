@@ -21,6 +21,7 @@ LiX has a very simple Lisp-like syntax. Every expression is one of the following
 
 Currently only integer numbers are supported. 
 Strings are enclosed in quotes, as usual.
+Symbols are case insensitive and are internally translated to capital letters.
 
 The EBNF used by the parser looks like follows:
 ```
