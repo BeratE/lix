@@ -1,6 +1,6 @@
-# $/Lambda /iota /Chi$
+# &Lambda;&iota$Chi;
 
-$/Lambda /iota /Chi$/ LiX - or Lychee, like the fruit - is a purely functional Lisp like toy language based on an interpreted, extended Lambda Calculus. The purpose of the project is to explore the boundaries and implications of a purely functional Lisp.
+&Lambda;&iota$Chi;/ LiX - or Lychee, like the fruit - is a purely functional Lisp like toy language based on an interpreted, extended Lambda Calculus. The purpose of the project is to explore the boundaries and implications of a purely functional Lisp.
 
 The name is a play on Lisp and Lambda interpreter (Linp).
 
