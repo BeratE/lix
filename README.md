@@ -52,16 +52,18 @@ Internally, only lambda abstractions with one single bound variable are regarded
 ##### COND (cond ((p1 e1) .. (pn en)))
 The `COND` expression, as known from Lisp, appears in the form `(COND ((p1 e1) .. (pn en)))`. The predicates p1 to pn are evaluated up until the first one that returns a non-nil value, lets say pi. The corresponding expression ei is then evaluated and returned as the value of the whole `COND` expression. If no predicate evaluates to a non-nil value, the empty list `NIL` is returned. The `COND` expression is internally translated to a sequence of nested `IF` expressions.
 
-##### LET (let a expr expr')
+##### LET (let f val expr)
+The expression `(LET f val expr)` will be translated to `((\f.expr) (FIX (\f.val)))`, 
+where f denotes a labelling symbol that is bound to the (possibly recursive) expression val. This construct enables one to define recursive functions, by means of fixpoint computations. See below for the semantics of `FIX`.
 
-TODO..
 
 ## Semantics / Evaluation
-The empty list `()` is evaluated to the special symbol `NIL`. 
-
 The symbol `BOT` (bottom) is used to denote an error.
 
-TODO..
+The empty list `()` is evaluated to the special symbol `NIL`, which is also used to denote falsity, e.g `(EQ 1 2)` will return `NIL`. There is no explicit truth value in the language. Any non-nil value is accepted to be true.
+
+The expression `(FIX f)` computes the fixpoint of f, by applying f again to the expression itself. The fixpoint of f is that input value x, such that f x = x. 
+
 
 ## Example
 The fibonacci function in LiX looks like this:
