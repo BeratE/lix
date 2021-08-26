@@ -1,7 +1,8 @@
-# LiX
+# $/Lambda /iota /Chi $
 
-LiX - or Lychee, like the fruit - is a purely functional Lisp like toy language based on an interpreted, extended Lambda Calculus.
-The name comes from the fact that LiX is some mix of a Lisp and a Lambda interpreter (Linp).
+$/Lambda /iota /Chi $/ LiX - or Lychee, like the fruit - is a purely functional Lisp like toy language based on an interpreted, extended Lambda Calculus. The purpose of the project is to explore the boundaries and implications of a purely functional Lisp.
+
+The name is a play on Lisp and Lambda interpreter (Linp).
 
 ## Features
 This project includes: 
@@ -13,6 +14,7 @@ This project includes:
 * Lisp primitives `ATOM`, `EQ`, `CAR`, `CDR`, `CONS`, `IF` realised as delta rules. 
 * Lisp primitive `QUOTE` as extension of evaluation strategy, i.e. no further evaluation of arguments.
 * Delta rules for fixpoint evaluation and recursive let declarations.
+* Interactive REPL.
 
 
 ## Syntax
