@@ -22,7 +22,7 @@ instance Show LispVal where
       (Symbol sym) -> sym
       (List [Symbol "LAMBDA", x, y]) -> "(\0955"++(show x)++"."++(show y)++")"
       (List [Symbol "QUOTE", x]) -> "'" ++ (show x)
-      (List ts) -> "(" ++  init (showApp ts) ++")"
+      (List ts) -> "(" ++  (if null ts then "" else init (showApp ts)) ++")"
       where showApp [] = []
             showApp (t:ts) = show t ++ " " ++ showApp ts
 

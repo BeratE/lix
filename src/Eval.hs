@@ -1,4 +1,4 @@
-module Eval where
+module Eval (eval) where
 
 import LispVal
 import Data.List
@@ -14,6 +14,7 @@ constSym    = symSpecial ++ symConst
 ret t ts = if null ts then t else List (t : ts)
 isClosed v = null $ (freeVar v)
 getArgs p = fmap unquote $ if isClosed (List p) then fmap eval p else []
+quote t = List [Symbol "QUOTE", t]
 unquote (List [Symbol "QUOTE", t]) = t
 unquote t = t
 
@@ -65,7 +66,6 @@ applyDelta (List (Symbol c : ts))
   | otherwise            =  Symbol "BOT"
 applyDelta _ = Symbol "BOT"
 
--- perform arithmetic operations on two values
 deltaArith :: String -> [LispVal] -> LispVal
 deltaArith c (a:b:ts)
   = let args = getArgs [a,b]       
@@ -77,12 +77,10 @@ deltaArith c (a:b:ts)
          [Lit (Number a'), Lit (Number b')] -> ret (Lit (Number (perf c a' b'))) ts
          otherwise -> Symbol "BOT"
 
--- fixpoint, fix f => f (fix f)
 deltaFix :: [LispVal] -> LispVal
 deltaFix ts = List ((List [Symbol "LAMBDA", Symbol "F",
                            List [Symbol "F", List [Symbol "FIX", Symbol "F"]]]) : ts)
 
--- if t, returns corresponding lambda expression for t equal to nil or non-nil
 deltaIf :: [LispVal] -> LispVal
 deltaIf (t : ts)
   = let f val = List [Symbol "LAMBDA", Symbol "X",
@@ -94,7 +92,6 @@ deltaIf (t : ts)
          otherwise      -> Symbol "BOT"
 deltaIf _ = Symbol "BOT"
 
--- check if argument one and two are equal
 deltaEq :: [LispVal] -> LispVal
 deltaEq (t1 : t2 : ts)
   = let args = getArgs [t1,t2]
@@ -107,61 +104,73 @@ deltaEq (t1 : t2 : ts)
          otherwise -> Symbol "BOT"
 deltaEq _ = Symbol "BOT"
            
--- check if argument is a lit or symbol
 deltaAtom :: [LispVal] -> LispVal
 deltaAtom (t:ts)
   = let t' = getArgs [t]
     in case t' of
-         [a@(Symbol _)] -> ret (Lit $ Number 1) ts
-         [a@(Lit    _)] -> ret (Lit $ Number 1) ts
+         [Symbol "BOT"] -> Symbol "BOT"
+         [Symbol _]     -> ret (Lit $ Number 1) ts
+         [Lit    _]     -> ret (Lit $ Number 1) ts
+         [List []]      -> ret (Lit $ Number 1) ts
          [_]            -> Symbol "NIL"
          otherwise      -> Symbol "BOT"
 deltaAtom _ = Symbol "BOT"
 
 deltaCons :: [LispVal] -> LispVal
 deltaCons (t1 : t2 : ts)
-  = let a = deltaAtom [t1]
-        in if a == Symbol "NIL" || a == Symbol "BOT"
-           then Symbol "BOT"
-           else case getArgs [t2] of
-                  [List bs] -> ret (List (a:bs)) ts
-                  otherwise  -> Symbol "BOT"
+  = case getArgs [t1, t2] of
+      [Symbol "BOT", _] -> Symbol "BOT"
+      [List _,       _] -> Symbol "BOT"
+      [a,      List bs] -> ret (quote $ List (a:bs)) ts
+      [a, Symbol "NIL"] -> ret (quote $ List [a]) ts
+      otherwise         -> Symbol "BOT"
 deltaCons _ = Symbol "BOT"
 
 deltaCar :: [LispVal] -> LispVal
 deltaCar (t : ts)
   = case getArgs [t] of
-      [List (a:as)] -> ret (List [Symbol "QUOTE", a]) ts
+      [List (a:as)] -> ret (quote a) ts
       otherwise     -> Symbol "BOT"
 deltaCar _ = Symbol "BOT"
 
 deltaCdr :: [LispVal] -> LispVal
 deltaCdr (t:ts)
   = case getArgs [t] of
-      [List (a:as)] -> ret (List [Symbol "QUOTE", List as]) ts
+      [List (a:as)] -> ret (quote $ List as) ts
       otherwise     -> Symbol "BOT"
 deltaCdr _ = Symbol "BOT"
 
 
--- Weak Head Normal Order reduction, one step using leftmost-outermost 
-reduce :: LispVal -> LispVal
+-- Weak Head Normal Order reduction, one step leftmost-outermost
+reduce :: LispVal -> (LispVal, Bool)
 reduce (List [t]) = reduce t
-reduce t@(Lit _) = t
-reduce t@(Symbol _) = t
-reduce t@(List (Lit _ : _)) = t
-reduce t@(List [Symbol "LAMBDA", Symbol _, _]) = t
-reduce t@(List (Symbol c: _)) = if c `elem` symConst then applyDelta t else t
-reduce t@(List (List [Symbol "LAMBDA", _, _] : _)) = applyBeta t
-reduce (List (List t : ts))
-  = let r = reduce $ List t
-    in if r == Symbol "BOT" then Symbol "BOT" else List (r:ts)                        
-reduce _ = Symbol "BOT"
 
+reduce t@(List (Symbol c: _))
+  = if c `elem` symConst
+    then let d = applyDelta t
+         in if d == Symbol "BOT"
+            then (Symbol "BOT", True)
+            else (d, False)
+    else (t, True)
+                 
+reduce t@(List (List [Symbol "LAMBDA", _, _] : _))
+  = let b = applyBeta t
+    in if b == Symbol "BOT"
+       then (Symbol "BOT", True)
+       else (b, False)
+            
+reduce (List (List t : ts))
+  = let (r, f) = reduce $ List t
+    in if r == Symbol "BOT"
+       then (Symbol "BOT", True)
+       else (List (r:ts), f)
+            
+reduce t = (t, True) -- nothing to be done
 
 -- translate a complex term into a simple term
 transl :: LispVal -> LispVal
 transl (List [t]) = transl t
-transl (List [])  = Symbol "NIL"
+transl t@(List [Symbol "QUOTE", _]) = t
 
 transl (List [Symbol "LET", f@(Symbol _), val, expr])
   = let b = List [Symbol "FIX", (List [Symbol "LAMBDA", f, (transl val)])]
@@ -186,6 +195,5 @@ transl t = t
 eval :: LispVal -> LispVal
 eval t = evalt $ transl t
   where evalt (List [t]) = evalt t
-        evalt t = let r = reduce t
-                  in if r == Symbol "BOT" || r == t
-                     then r else evalt r
+        evalt t = let (r, f) = reduce t
+                  in if f then r else evalt r

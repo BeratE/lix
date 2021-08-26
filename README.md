@@ -65,6 +65,7 @@ The empty list `()` is evaluated to the special symbol `NIL`, which is also used
 
 The expression `(FIX f)` computes the fixpoint of f, by applying f again to the expression itself. The fixpoint of f is that input value x, such that f x = x. 
 
+TODO give operational semantics of delta rules
 
 ## Example
 The fibonacci function in LiX looks like this:
