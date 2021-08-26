@@ -12,8 +12,7 @@ This project includes:
 * Extended with constants & delta-rules for fixpoint computation, arithmetic, etc. (delta-reduction)
 * Weak Head Normal Order (WHNO) reduction to mimic a lazy evaluation strategy (confluence is ensured).
 * Lisp primitives `ATOM`, `EQ`, `CAR`, `CDR`, `CONS`, `IF` realised as delta rules. 
-* Lisp primitive `QUOTE` as extension of evaluation strategy, i.e. no further evaluation of arguments.
-* Delta rules for fixpoint evaluation and recursive let declarations.
+* Lisp primitive `QUOTE` as extension of evaluation strategy, i.e. expression in quote treated as constant in a monadic closure.
 * Interactive REPL.
 
 
