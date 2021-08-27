@@ -86,7 +86,7 @@ pList = do xs <- many1 $ token pExpr
 
 -- building the parse tree
 readExpr :: String -> Maybe LispVal
-readExpr s = parse (token pExpr) s >>= \(v, _) -> (return v)
+readExpr s = snd <$> parse (token pExpr) s
   
 readExprFile :: String -> IO LispVal
 readExprFile file = do contents <- readFile file
