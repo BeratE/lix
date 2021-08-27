@@ -37,7 +37,7 @@ procCmd ["help"] = outputStrLn helpText >> doRepl
 procCmd ["load"] = outputStrLn "Please specify a proper file handle." >> doRepl
 procCmd ["load", file]
   = do expr <- lift $ readExprFile file
-       outputStrLn $ show $ eval $ expr
+       outputStrLn $ show $ eval expr
        doRepl
 procCmd _ = doRepl
 
