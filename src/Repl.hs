@@ -16,7 +16,7 @@ doRepl :: InputT IO ()
 doRepl = do
   minp <- getInputLine "LiX > "
   case minp of
-    Nothing        -> outputStrLn $ "Something went wrong."
+    Nothing        -> outputStrLn "Something went wrong."
     Just (':':cmd) -> procCmd $ words cmd
     Just inp       -> do outputStrLn $ procExpr inp
                          doRepl
@@ -29,7 +29,7 @@ procExpr str
          Just x  -> (show x) ++ "\n" ++ (printExpr $ eval x)
 
 printExpr :: LispVal -> String
-printExpr expr = (show expr) ++ "\n"
+printExpr expr = show expr ++ "\n"
 
 procCmd :: [String] -> InputT IO ()
 procCmd ["quit"] = outputStrLn "\nFarewell.\n" >> return () 
@@ -37,7 +37,7 @@ procCmd ["help"] = outputStrLn helpText >> doRepl
 procCmd ["load"] = outputStrLn "Please specify a proper file handle." >> doRepl
 procCmd ["load", file]
   = do expr <- lift $ readExprFile file
-       outputStrLn $ show $ eval $ expr
+       outputStrLn $ show $ eval expr
        doRepl
 procCmd _ = doRepl
 

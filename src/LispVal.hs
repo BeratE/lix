@@ -40,12 +40,10 @@ pExpr = pSpecial +++ pSymbol +++ pNumber +++ pString +++ pSExpr
 
 -- basic building blocks
 pSymbol :: Parser LispVal
-pSymbol = do p <- sym
-             return $ Symbol p
+pSymbol = Symbol <$> sym
 
 pNumber :: Parser LispVal
-pNumber = do n <- int
-             return $ Lit $ Number n
+pNumber = Lit . Number <$> int
 
 pString :: Parser LispVal
 pString = do char '\"'
@@ -74,7 +72,7 @@ pLambda = do char '('
              vs <- Parser.many1 $ token pSymbol
              x <- case vs of
                     [v]       -> return v
-                    otherwise -> return $ List vs
+                    _         -> return $ List vs
              token $ char '.'
              y <- token pExpr
              char ')'
@@ -82,13 +80,12 @@ pLambda = do char '('
 
 -- for parsing a sequence of expressions
 pList :: Parser LispVal
-pList = do xs <- many1 $ token pExpr
-           return $ List xs
+pList = List <$> many1 (token pExpr)
 
 
 -- building the parse tree
 readExpr :: String -> Maybe LispVal
-readExpr s = parse (token pExpr) s >>= \(v, _) -> (return v)
+readExpr s = snd <$> parse (token pExpr) s
   
 readExprFile :: String -> IO LispVal
 readExprFile file = do contents <- readFile file
