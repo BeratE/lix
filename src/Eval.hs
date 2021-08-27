@@ -65,7 +65,6 @@ applyDelta (List (Symbol c : ts))
     "CDR"  -> deltaCdr ts
     "CONS" -> deltaCons ts
     _      -> Symbol "BOT"
-applyDelta _ = Symbol "BOT"
 
 deltaArith :: String -> [LispVal] -> LispVal
 deltaArith c (a:b:ts)
