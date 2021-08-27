@@ -40,8 +40,7 @@ pExpr = pSpecial +++ pSymbol +++ pNumber +++ pString +++ pSExpr
 
 -- basic building blocks
 pSymbol :: Parser LispVal
-pSymbol = do p <- sym
-             return $ Symbol p
+pSymbol = Symbol <$> sym
 
 pNumber :: Parser LispVal
 pNumber = do n <- int
