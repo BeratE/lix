@@ -43,8 +43,7 @@ pSymbol :: Parser LispVal
 pSymbol = Symbol <$> sym
 
 pNumber :: Parser LispVal
-pNumber = do n <- int
-             return $ Lit $ Number n
+pNumber = Lit . Number <$> int
 
 pString :: Parser LispVal
 pString = do char '\"'
