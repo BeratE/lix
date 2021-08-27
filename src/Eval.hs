@@ -56,14 +56,15 @@ applyBeta _ = Symbol "BOT"
 applyDelta :: LispVal -> LispVal
 applyDelta (List (Symbol c : ts))
   | c `elem` symConstOps = deltaArith c ts
-  | c == "FIX"           = deltaFix ts 
-  | c == "IF"            = deltaIf ts  
-  | c == "EQ"            = deltaEq ts  
-  | c == "ATOM"          = deltaAtom ts
-  | c == "CAR"           = deltaCar ts
-  | c == "CDR"           = deltaCdr ts
-  | c == "CONS"          = deltaCons ts
-  | otherwise            =  Symbol "BOT"
+  | otherwise = case c of
+    "FIX"  -> deltaFix ts
+    "IF"   -> deltaIf ts
+    "EQ"   -> deltaEq ts
+    "ATOM" -> deltaAtom ts
+    "CAR"  -> deltaCar ts
+    "CDR"  -> deltaCdr ts
+    "CONS" -> deltaCons ts
+    _      -> Symbol "BOT"
 applyDelta _ = Symbol "BOT"
 
 deltaArith :: String -> [LispVal] -> LispVal
