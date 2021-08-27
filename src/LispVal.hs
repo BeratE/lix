@@ -80,8 +80,7 @@ pLambda = do char '('
 
 -- for parsing a sequence of expressions
 pList :: Parser LispVal
-pList = do xs <- many1 $ token pExpr
-           return $ List xs
+pList = List <$> many1 (token pExpr)
 
 
 -- building the parse tree
