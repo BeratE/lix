@@ -16,7 +16,7 @@ doRepl :: InputT IO ()
 doRepl = do
   minp <- getInputLine "LiX > "
   case minp of
-    Nothing        -> outputStrLn $ "Something went wrong."
+    Nothing        -> outputStrLn "Something went wrong."
     Just (':':cmd) -> procCmd $ words cmd
     Just inp       -> do outputStrLn $ procExpr inp
                          doRepl
