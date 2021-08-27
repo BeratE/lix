@@ -72,7 +72,7 @@ pLambda = do char '('
              vs <- Parser.many1 $ token pSymbol
              x <- case vs of
                     [v]       -> return v
-                    otherwise -> return $ List vs
+                    _         -> return $ List vs
              token $ char '.'
              y <- token pExpr
              char ')'
