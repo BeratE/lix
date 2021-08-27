@@ -29,7 +29,7 @@ procExpr str
          Just x  -> (show x) ++ "\n" ++ (printExpr $ eval x)
 
 printExpr :: LispVal -> String
-printExpr expr = (show expr) ++ "\n"
+printExpr expr = show expr ++ "\n"
 
 procCmd :: [String] -> InputT IO ()
 procCmd ["quit"] = outputStrLn "\nFarewell.\n" >> return () 
