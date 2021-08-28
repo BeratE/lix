@@ -7,8 +7,8 @@ cabal-version: 1.12
 name:           lix
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/lix#readme>
-homepage:       https://github.com/githubuser/lix#readme
-bug-reports:    https://github.com/githubuser/lix/issues
+homepage:       https://github.com/BeratE/lix#readme
+bug-reports:    https://github.com/BeratE/lix/issues
 author:         Berat Ertural
 maintainer:     berat.ertural@rwth-aachen.de
 copyright:      2021 Berat Ertural
@@ -21,13 +21,13 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/lix
+  location: https://github.com/BeratE/lix
 
 library
   exposed-modules:
-      Parser
-      LispVal
       Eval
+      LispVal
+      Parser
       Repl
   other-modules:
       Paths_lix
@@ -37,6 +37,7 @@ library
       base >=4.7 && <5
     , containers
     , haskeline
+    , mtl
     , transformers
   default-language: Haskell2010
 
@@ -52,6 +53,7 @@ executable lix-exe
     , containers
     , haskeline
     , lix
+    , mtl
     , transformers
   default-language: Haskell2010
 
@@ -68,5 +70,6 @@ test-suite lix-test
     , containers
     , haskeline
     , lix
+    , mtl
     , transformers
   default-language: Haskell2010

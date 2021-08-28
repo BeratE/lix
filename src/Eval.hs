@@ -1,187 +1,200 @@
-module Eval (eval) where
+module Eval (transl, eval) where
 
 import LispVal
 import Data.List
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Monad.Reader
 
--- collection of constants and special symbols
-symConstOps = ["+","-","*"]
-symConstFun = ["FIX", "IF", "EQ", "ATOM", "CAR", "CDR", "CONS"]
-symConst    = symConstFun ++ symConstOps
-symSpecial  = ["BOT", "NIL", "QUOTE", "LAMBDA"]
-constSym    = symSpecial ++ symConst
+type LispEnv = Map String LispVal
+type EnvCtx = Reader LispEnv
 
--- helper functions
-ret t ts = if null ts then t else List (t : ts)
-isClosed v = null $ (freeVar v)
-getArgs p = fmap unquote $ if isClosed (List p) then fmap eval p else []
+-- Set of constants and special symbols.
+symConstSpecial = Set.fromList ["BOT", "NIL", "QUOTE", "DEF", "LAMBDA"]
+symConstOpsD = Set.fromList ["+","-","*"]
+symConstFunD = Set.fromList ["FIX", "IF", "EQ", "ATOM", "CAR", "CDR", "CONS"]
+symConstD = Set.union symConstFunD symConstOpsD
+symConst  = Set.union symConstD symConstSpecial
+
+quote :: LispVal -> LispVal
 quote t = List [Symbol "QUOTE", t]
+unquote :: LispVal -> LispVal
 unquote (List [Symbol "QUOTE", t]) = t
 unquote t = t
 
--- get free variables of a lambda term
-freeVar :: LispVal -> [String]
-freeVar t = (fv t) \\ constSym
-            where fv (Lit _) = []
-                  fv (Symbol s) = [s]
-                  fv (List [Symbol "QUOTE", _]) = []
-                  fv (List [Symbol "LAMBDA", Symbol s, body]) = delete s $ fv body
-                  fv (List xs) = foldr union [] $ fmap fv xs
+-- Get free variables of a lambda term. Variables bound to env are not free.
+freeVar :: LispVal -> EnvCtx (Set String)
+freeVar t = do env <- ask
+               return $ Set.difference (fv env t) symConst
+    where fv :: LispEnv -> LispVal -> Set String
+          fv env (Lit _) = Set.empty
+          fv env (List [Symbol "QUOTE", _]) = Set.empty
+          fv env (List [Symbol "LAMBDA", Symbol s, body]) = Set.delete s $ fv env body
+          fv env (List xs) = foldr Set.union Set.empty $ fmap (fv env) xs
+          fv env (Symbol s) = if Map.member s env then Set.empty else Set.singleton s
 
--- substitute free occurence of symbol x by term t in term r
-subst :: String -> LispVal -> LispVal -> LispVal
-subst x (List [t]) r = subst x t r
-subst x t r@(Lit _) = r
-subst x t r@(Symbol s) = if (s == x) then t else r
-subst x t r@(List [Symbol "QUOTE", _]) = r
+isClosed :: LispVal -> EnvCtx Bool
+isClosed t = Set.null <$> freeVar t
+
+-- Substitute free occurences of symbol x by term t in term r.
+subst :: String -> LispVal -> LispVal -> EnvCtx LispVal
+subst x t r@(Lit _) = return r
+subst x t r@(Symbol s) = return $ if (s == x) then t else r
+subst x t r@(List [Symbol "QUOTE", _]) = return r
 subst x t r@(List [l@(Symbol "LAMBDA"), p@(Symbol y), b])
-    | y == x               = r
-    | y `elem` (freeVar t) = subst x t $ rename (y++"`") r
-    | otherwise            = List [l, p, subst x t b]
-subst x t r@(List rs) = List $ map (subst x t) rs
+    | x == y    = return r
+    | otherwise = do fv <- freeVar t
+                     if (Set.member y fv)
+                     then do k <- rename (y++"`") r
+                             subst x t k
+                     else do a <- subst x t b
+                             return $ List [l, p, a]
+subst x t r@(List rs) = do env <- ask
+                           let a = fmap (subst x t) rs
+                               b = fmap runReader a
+                               c = fmap ($ env) b
+                           return $ List c
 
--- renaming of bound variable y in a lambda expression t (simple alpha reduction)
-rename :: String -> LispVal -> LispVal
-rename y (List [t]) = rename y t
+
+-- Rename bound variable y in a lambda expression t (simple alpha reduction).
+rename :: String -> LispVal -> EnvCtx LispVal
 rename y (List [Symbol "LAMBDA", Symbol x, b])
-  = List [Symbol "LAMBDA", Symbol y, subst x (Symbol y) b]
-rename y t = t
+  = do r <- subst x (Symbol y) b
+       return $ List [Symbol "LAMBDA", Symbol y, r]
 
--- betaRed reduction (lamba abstraction) using leftmost-outermost evaluation
-applyBeta :: LispVal -> LispVal
+
+ret :: LispVal -> [LispVal] -> LispVal
+ret t ts = if null ts then t else List (t : ts)
+
+-- Beta reduction (lamba abstraction) using leftmost-outermost evaluation.
+applyBeta :: LispVal -> EnvCtx LispVal
 applyBeta (List (List [Symbol "LAMBDA", Symbol x, b] : t : ts)) =
-  let t' = subst x t b in ret t' ts
-applyBeta _ = Symbol "BOT"
+  do r <- subst x t b
+     return $ ret r ts
+applyBeta _ = return $ Symbol "BOT"
 
--- deltaRed reduction (constants/functions) using leftmost-outermost evaluation
-applyDelta :: LispVal -> LispVal
+
+-- Delta reduction (constants/functions) using leftmost-outermost evaluation.
+applyDelta :: LispVal -> EnvCtx LispVal
 applyDelta (List (Symbol c : ts))
-  | c `elem` symConstOps = deltaArith c ts
+  | Set.member c symConstOpsD = deltaArith c ts
   | otherwise = case c of
-    "FIX"  -> deltaFix ts
-    "IF"   -> deltaIf ts
-    "EQ"   -> deltaEq ts
-    "ATOM" -> deltaAtom ts
-    "CAR"  -> deltaCar ts
-    "CDR"  -> deltaCdr ts
-    "CONS" -> deltaCons ts
-    _      -> Symbol "BOT"
+        "FIX"  -> deltaFix ts
+        "IF"   -> deltaIf ts
+        "EQ"   -> deltaEq ts
+        "ATOM" -> deltaAtom ts
+        "CAR"  -> deltaCar ts
+        "CDR"  -> deltaCdr ts
+        "CONS" -> deltaCons ts
+        _      -> return $ Symbol "BOT"
 
-deltaArith :: String -> [LispVal] -> LispVal
+argsEval :: [LispVal] -> Reader LispEnv [LispVal]
+argsEval as = do b <- isClosed (List as)
+                 if b then do env <- ask
+                              let a = fmap eval as
+                                  b = fmap runReader a
+                                  c = fmap ($ env) b
+                              return $ fmap unquote c
+                   else return []
+
+
+deltaArith :: String -> [LispVal] -> EnvCtx LispVal
 deltaArith c (a:b:ts)
-  = let args = getArgs [a,b]       
-        perf c a b = case c of
-          "+" -> a + b
-          "-" -> a - b
-          "*" -> a * b         
-    in case args of
+  = do args <- argsEval [a,b]
+       let perf c a b = case c of
+             "+" -> a + b
+             "-" -> a - b
+             "*" -> a * b         
+       return $ case args of
          [Lit (Number a'), Lit (Number b')] -> ret (Lit (Number (perf c a' b'))) ts
          otherwise -> Symbol "BOT"
+deltaArith _ _= return $ Symbol "BOT"
 
-deltaFix :: [LispVal] -> LispVal
-deltaFix ts = List ((List [Symbol "LAMBDA", Symbol "F",
-                           List [Symbol "F", List [Symbol "FIX", Symbol "F"]]]) : ts)
+deltaFix :: [LispVal] -> EnvCtx LispVal
+deltaFix ts = return $
+  List ((List [Symbol "LAMBDA", Symbol "F",
+                List [Symbol "F", List [Symbol "FIX", Symbol "F"]]]) : ts)
 
-deltaIf :: [LispVal] -> LispVal
+deltaIf :: [LispVal] -> EnvCtx LispVal
 deltaIf (t : ts)
-  = let f val = List [Symbol "LAMBDA", Symbol "X",
-                      (List [Symbol "LAMBDA", Symbol "Y", val])]
-    in case getArgs [t] of
+  = do args <- argsEval [t]
+       let f val = List [Symbol "LAMBDA", Symbol "X",
+                         (List [Symbol "LAMBDA", Symbol "Y", val])]
+       return $ case args of
          [Symbol "BOT"] -> Symbol "BOT"
          [Symbol "NIL"] -> ret (f (Symbol "Y")) ts
          [_]            -> ret (f (Symbol "X")) ts
          otherwise      -> Symbol "BOT"
-deltaIf _ = Symbol "BOT"
+deltaIf _ = return $ Symbol "BOT"
 
-deltaEq :: [LispVal] -> LispVal
+deltaEq :: [LispVal] -> EnvCtx LispVal
 deltaEq (t1 : t2 : ts)
-  = let args = getArgs [t1,t2]
-        eq a b = if a == b then (Lit $ Number 1)
-          else Symbol "NIL"
-    in case args of
+  = do argsEval <- argsEval [t1,t2]
+       let eq a b = if a == b then (Lit $ Number 1)
+                    else Symbol "NIL"
+       return $ case argsEval of
          [Symbol "BOT", _] -> Symbol "BOT"
          [_, Symbol "BOT"] -> Symbol "BOT"
          [a, b] -> ret (eq a b) ts
          otherwise -> Symbol "BOT"
-deltaEq _ = Symbol "BOT"
+deltaEq _ = return $ Symbol "BOT"
            
-deltaAtom :: [LispVal] -> LispVal
+deltaAtom :: [LispVal] -> EnvCtx LispVal
 deltaAtom (t:ts)
-  = let t' = getArgs [t]
-    in case t' of
+  = do args <- argsEval [t]
+       return $ case args of 
          [Symbol "BOT"] -> Symbol "BOT"
          [Symbol _]     -> ret (Lit $ Number 1) ts
          [Lit    _]     -> ret (Lit $ Number 1) ts
          [List []]      -> ret (Lit $ Number 1) ts
-         [_]            -> Symbol "NIL"
+         [_]            -> ret (Symbol "NIL") ts
          otherwise      -> Symbol "BOT"
-deltaAtom _ = Symbol "BOT"
+deltaAtom _ = return $ Symbol "BOT"
 
-deltaCons :: [LispVal] -> LispVal
+deltaCons :: [LispVal] -> EnvCtx LispVal
 deltaCons (t1 : t2 : ts)
-  = case getArgs [t1, t2] of
-      [Symbol "BOT", _] -> Symbol "BOT"
-      [List _,       _] -> Symbol "BOT"
-      [a,      List bs] -> ret (quote $ List (a:bs)) ts
-      [a, Symbol "NIL"] -> ret (quote $ List [a]) ts
-      otherwise         -> Symbol "BOT"
-deltaCons _ = Symbol "BOT"
+  = do args <- argsEval [t1, t2]
+       return $ case args of
+         [Symbol "BOT", _] -> Symbol "BOT"
+         [List _,       _] -> Symbol "BOT"
+         [a,      List bs] -> ret (quote $ List (a:bs)) ts
+         [a, Symbol "NIL"] -> ret (quote $ List [a]) ts
+         otherwise         -> Symbol "BOT"
+deltaCons _ = return $ Symbol "BOT"
 
-deltaCar :: [LispVal] -> LispVal
+deltaCar :: [LispVal] -> EnvCtx LispVal
 deltaCar (t : ts)
-  = case getArgs [t] of
-      [List (a:as)] -> ret (quote a) ts
-      otherwise     -> Symbol "BOT"
-deltaCar _ = Symbol "BOT"
+  = do args <- argsEval [t]
+       return $ case args of 
+         [List (a:as)] -> ret (quote a) ts
+         otherwise     -> Symbol "BOT"
+deltaCar _ = return $ Symbol "BOT"
 
-deltaCdr :: [LispVal] -> LispVal
+deltaCdr :: [LispVal] -> EnvCtx LispVal
 deltaCdr (t:ts)
-  = case getArgs [t] of
-      [List (a:as)] -> ret (quote $ List as) ts
-      otherwise     -> Symbol "BOT"
-deltaCdr _ = Symbol "BOT"
+  = do args <- argsEval [t]
+       return $ case args of 
+         [List (a:as)] -> ret (quote $ List as) ts
+         otherwise     -> Symbol "BOT"
+deltaCdr _ = return $ Symbol "BOT"
 
 
--- Weak Head Normal Order reduction, one step leftmost-outermost
-reduce :: LispVal -> (LispVal, Bool)
-reduce (List [t]) = reduce t
-
-reduce t@(List (Symbol c: _))
-  = if c `elem` symConst
-    then let d = applyDelta t
-         in if d == Symbol "BOT"
-            then (Symbol "BOT", True)
-            else (d, False)
-    else (t, True)
-                 
-reduce t@(List (List [Symbol "LAMBDA", _, _] : _))
-  = let b = applyBeta t
-    in if b == Symbol "BOT"
-       then (Symbol "BOT", True)
-       else (b, False)
-            
-reduce (List (List t : ts))
-  = let (r, f) = reduce $ List t
-    in if r == Symbol "BOT"
-       then (Symbol "BOT", True)
-       else (List (r:ts), f)
-            
-reduce t = (t, True) -- nothing to be done
-
--- translate a complex term into a simple term
+-- Translate a complex term into a simple term
 transl :: LispVal -> LispVal
 transl (List [t]) = transl t
-transl t@(List [Symbol "QUOTE", _]) = t
 
+transl t@(List [Symbol "QUOTE", _]) = t
 transl (List [Symbol "LET", f@(Symbol _), val, expr])
   = let b = List [Symbol "FIX", (List [Symbol "LAMBDA", f, (transl val)])]
         a = List [Symbol "LAMBDA", f, (transl expr)]
     in List [a, b]
-              
+       
 transl (List [Symbol "COND", List ((List [p,e]) : cs)])
-  | null cs   = transl $ List [Symbol "IF", p, e, Symbol "NIL"]
-  | otherwise = transl $ List [Symbol "IF", p, e, transl (List [Symbol "COND",
-                                                                List (cs)])]
-                
+  | null cs   =transl$ List [Symbol "IF", p, e, Symbol "NIL"]
+  | otherwise =transl$ List [Symbol "IF", p, e, transl (List [Symbol "COND", List (cs)])]
+  
 transl (List [Symbol "LAMBDA", List x', body])
   = case x' of
       []     -> body
@@ -191,9 +204,38 @@ transl (List [Symbol "LAMBDA", List x', body])
 transl (List ts) = List $ map transl ts
 transl t = t
 
--- reduce term until weak head normal form
-eval :: LispVal -> LispVal
-eval t = evalt $ transl t
-  where evalt (List [t]) = evalt t
-        evalt t = let (r, f) = reduce t
-                  in if f then r else evalt r
+
+-- Reduce term until closed normal form.
+eval :: LispVal -> EnvCtx LispVal
+eval t = let tr = transl t
+         in do r <- reduce tr
+               return r
+
+reduce :: LispVal -> EnvCtx LispVal
+reduce t@(Lit _) = return t
+reduce t@(List [Symbol "QUOTE", _]) = return t
+reduce t@(List [Symbol "LAMBDA", Symbol _, _]) = return t
+
+reduce t@(Symbol s)
+  = if s `elem` symConst
+    then return t
+    else do asks (Map.findWithDefault (Symbol "BOT") s)
+  
+reduce (List [t]) = reduce t
+
+reduce t@(List (Symbol c: _)) = do {d <- applyDelta t; reduce d}
+
+reduce t@(List (List [Symbol "LAMBDA", _, _] : _)) = do {b <- applyBeta t; reduce b}
+
+reduce (List ((List [Symbol "DEF", Symbol f, expr]) : ts))
+  = local (Map.insert f expr) $ reduce (List ts)
+
+reduce (List (t : ts)) =
+  do r <- reduce t
+     if r == Symbol "BOT" || r == t
+       then return $ Symbol "BOT"
+       else do k <- reduce (List (r : ts))
+               return k
+               
+
+reduce _ = return $ Symbol "BOT"

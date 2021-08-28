@@ -1,6 +1,6 @@
 name:                lix
 version:             0.1.0.0
-github:              "githubuser/lix"
+github:              "BeratE/lix"
 license:             BSD3
 author:              "Berat Ertural"
 maintainer:          "berat.ertural@rwth-aachen.de"
@@ -22,8 +22,9 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - containers
-- haskeline
 - transformers
+- haskeline
+- mtl
 
 library:
   source-dirs: src

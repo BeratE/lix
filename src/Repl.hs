@@ -3,8 +3,11 @@ module Repl (repl) where
 import Parser
 import LispVal
 import Eval
-import System.Console.Haskeline
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Monad.Reader
 import Control.Monad.Trans.Class
+import System.Console.Haskeline
 
 repl :: IO ()
 repl = do
@@ -26,7 +29,7 @@ procExpr str
   = let expr = readExpr str
     in case expr of              
          Nothing -> "parse error."
-         Just x  -> (show x) ++ "\n" ++ (printExpr $ eval x)
+         Just x  -> (show x) ++ "\n" ++ (printExpr $ runReader (eval x) Map.empty)
 
 printExpr :: LispVal -> String
 printExpr expr = show expr ++ "\n"
@@ -37,7 +40,7 @@ procCmd ["help"] = outputStrLn helpText >> doRepl
 procCmd ["load"] = outputStrLn "Please specify a proper file handle." >> doRepl
 procCmd ["load", file]
   = do expr <- lift $ readExprFile file
-       outputStrLn $ show $ eval expr
+       outputStrLn $ show $ runReader (eval expr) Map.empty
        doRepl
 procCmd _ = doRepl
 
