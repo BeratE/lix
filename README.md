@@ -1,6 +1,6 @@
 # &lambda;&iota;&Chi;
 
-![Lychee Logo](LiX.png "Lychee Logo")
+![Lychee Logo](LiXlogo.png "Lychee Logo")
 
 &lambda;&iota;&Chi;/ LiX - or Lychee, like the fruit - is a purely functional Lisp like toy language based on an interpreted, extended Lambda Calculus. The purpose of the project is to explore the boundaries and implications of a purely functional Lisp.
 
